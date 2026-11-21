@@ -1,0 +1,41 @@
+[[v5.14.5]]
+== 5.14.5
+
+*Date of Release:* ❓
+
+*Scope:* Bug fixes and enhancements since 5.14.4
+
+For a complete list of all _closed_ issues and pull requests for this release, consult the
+link:{junit-framework-repo}+/milestone/❓?closed=1+[5.14.5] milestone page in the JUnit
+repository on GitHub.
+
+
+[[v5.14.5-junit-platform]]
+=== JUnit Platform
+
+[[v5.14.5-junit-platform-bug-fixes]]
+==== Bug Fixes
+
+* `NamespacedHierarchicalStore` no longer retains the `defaultCreator` passed to
+  `getOrComputeIfAbsent(...)` after the value has been computed. Previously, any objects
+  captured by the creator remained strongly reachable for the lifetime of the store, which
+  could lead to memory leaks.
+
+
+[[v5.14.5-junit-jupiter]]
+=== JUnit Jupiter
+
+[[v5.14.5-junit-jupiter-bug-fixes]]
+==== Bug Fixes
+
+* Test instances of `@ParameterizedTest` methods are no longer retained until the end of
+  the test run. Previously, the instance of the first invocation was strongly reachable
+  from the root `ExtensionContext.Store`, which prevented resources it referenced &mdash;
+  for example, a Spring `ApplicationContext` closed via `@DirtiesContext` &mdash; from
+  being garbage collected.
+
+
+[[v5.14.5-junit-vintage]]
+=== JUnit Vintage
+
+No changes.
