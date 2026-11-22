@@ -12,10 +12,12 @@ package org.junit.platform.engine.support.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.platform.commons.test.ConcurrencyTestingUtils.executeConcurrently;
+import static org.junit.platform.commons.test.GarbageCollectionTestingUtils.assertEventuallyGarbageCollected;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -24,9 +26,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -365,6 +369,53 @@ public class NamespacedHierarchicalStoreTests {
 
 			assertEquals(value, store.get(ns1, key));
 			assertEquals(value2, store.get(ns2, key));
+		}
+
+	}
+
+	/**
+	 * @see <a href="https://github.com/junit-team/junit-framework/issues/6306">#6306</a>
+	 */
+	@Nested
+	class DefaultCreatorRetentionTests {
+
+		@Test
+		void defaultCreatorIsNotRetainedAfterValueHasBeenComputed() throws Exception {
+			// given/when
+			var capturedByCreator = computeValueWithCreatorCapturingNewObject(() -> value);
+
+			// then
+			assertEquals(value, store.get(namespace, key));
+			assertEventuallyGarbageCollected(capturedByCreator, "object captured by default creator");
+		}
+
+		@Test
+		void defaultCreatorIsNotRetainedAfterItThrewAnException() throws Exception {
+			// given
+			var exception = new RuntimeException("boom");
+
+			// when
+			var capturedByCreator = computeValueWithCreatorCapturingNewObject(() -> {
+				throw exception;
+			});
+
+			// then
+			assertSame(exception, assertThrows(RuntimeException.class, () -> store.get(namespace, key)));
+			assertEventuallyGarbageCollected(capturedByCreator, "object captured by default creator");
+		}
+
+		private WeakReference<Object> computeValueWithCreatorCapturingNewObject(Supplier<Object> valueSupplier) {
+			var objectCapturedByCreator = new Object();
+			try {
+				store.getOrComputeIfAbsent(namespace, key, __ -> {
+					assertNotNull(objectCapturedByCreator);
+					return valueSupplier.get();
+				});
+			}
+			catch (RuntimeException ignored) {
+				// verified by the caller
+			}
+			return new WeakReference<>(objectCapturedByCreator);
 		}
 
 	}

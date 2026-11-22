@@ -421,13 +421,19 @@ public final class NamespacedHierarchicalStore<N> implements AutoCloseable {
 	 * <p>If the delegate throws an exception, it is stored and rethrown every
 	 * time {@link #get()} is called.
 	 *
+	 * <p>Once the delegate has been called, the reference to it is released
+	 * so that it &mdash; and anything it captured, e.g. an
+	 * {@code ExtensionContext} and its test instance &mdash; can be garbage
+	 * collected even if this supplier is stored for a long time.
+	 *
 	 * @see StoredValue
 	 */
 	private static class MemoizingSupplier implements Supplier<Object> {
 
 		private static final Object NO_VALUE_SET = new Object();
 
-		private final Supplier<Object> delegate;
+		// only accessed while holding the lock; cleared after it has been called
+		private Supplier<Object> delegate;
 		private volatile Object value = NO_VALUE_SET;
 
 		private MemoizingSupplier(Supplier<Object> delegate) {
@@ -449,10 +455,12 @@ public final class NamespacedHierarchicalStore<N> implements AutoCloseable {
 			try {
 				if (this.value == NO_VALUE_SET) {
 					this.value = this.delegate.get();
+					this.delegate = null;
 				}
 			}
 			catch (Throwable t) {
 				this.value = new Failure(t);
+				this.delegate = null;
 				UnrecoverableExceptions.rethrowIfUnrecoverable(t);
 			}
 		}
